@@ -64,6 +64,9 @@ class AccountInvoice(models.Model):
     quickbooks_id = fields.Char("Quickbook id ", copy=False)
     qbd_number = fields.Char("QBD INV No.", copy=False)
     is_updated = fields.Boolean('Is Updated')
+    lpo_no = fields.Char('LPO #', copy=False)
+    veh_or_w_bill = fields.Char('VEH/W.BILL#', copy=False)
+    etr_no = fields.Char('ETR #', copy=False)
 
     # @api.onchange('partner_id')
     # def _onchange_partner_id(self):
@@ -145,7 +148,7 @@ class AccountInvoice(models.Model):
                 if not invoice_id:
                     # create new SO
                     # print('\nCreate New Sale invoice')
-                    print('invoice dict : ', invoice, '\n')
+                    # print('invoice dict : ', invoice, '\n')
                     vals = self._prepare_invoice_dict(invoice)
 
                     if vals:
@@ -196,6 +199,9 @@ class AccountInvoice(models.Model):
                 'quickbooks_id': invoice.get('quickbooks_id') if invoice.get('quickbooks_id') else '',
                 'invoice_date_due': invoice.get('date_due') if invoice.get('date_due') else '',
                 'qbd_number' : invoice.get('number') if invoice.get('number') else '',
+                'lpo_no':invoice.get('po_number') if invoice.get('po_number') else '',
+                'etr_no': invoice.get('etr_number') if invoice.get('etr_number') else '',
+                'veh_or_w_bill': invoice.get('veh_bill') if invoice.get('veh_bill') else '',
                 'move_type' : 'out_invoice',
             })
 
@@ -233,6 +239,10 @@ class AccountInvoice(models.Model):
                     vals_ol.update({'move_id': invoice_id.id})
                     vals_col.update({'move_id': invoice_id.id})
                     vals_tol.update({'move_id': invoice_id.id})
+
+                if 'unit' in line:
+                    if line.get('unit'):
+                        vals_ol.update({'x_studio_packaging':line.get('unit')})
 
                 if 'product_name' in line and line.get('product_name'):
                     product_id = self.env['product.product'].search([('quickbooks_id', '=', line.get('product_name'))])
@@ -553,6 +563,9 @@ class AccountInvoice(models.Model):
             'qbd_memo': invoice.name if invoice.name else '',
             'partner_name': invoice.partner_id.quickbooks_id,
             'invoice_date': invoice.invoice_date.strftime('%Y-%m-%d'),
+            'lpo_no' : invoice.lpo_no,
+            'veh_or_w_bill': invoice.veh_or_w_bill,
+            'etr_no': invoice.etr_no,
         })
 
         if invoice.invoice_line_ids:
@@ -579,6 +592,7 @@ class AccountInvoice(models.Model):
                 line_dict.update({
                     'payment_terms': invoice.partner_id.property_payment_term_id.name if invoice.partner_id.property_payment_term_id.quickbooks_id else '',
                     'ref_number': invoice.id,
+                    'unit': line.x_studio_packaging if line.x_studio_packaging else '',
                     'product_name': line.product_id.quickbooks_id if line.product_id else '',
                     'name': description,
                     'quantity': line.quantity if line.quantity else '',
@@ -587,6 +601,8 @@ class AccountInvoice(models.Model):
                     'qbd_tax_code': line.qbd_tax_code.name if line.qbd_tax_code.name else '',
                     'price_subtotal': line.price_subtotal if line.price_subtotal else '',
                 })
+
+
 
             if line_dict:
                 invoice_lines.append(line_dict)
