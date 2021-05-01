@@ -19,8 +19,8 @@ odoo.define('theme_clarico_vega.drift_zoom', function (require) {
                     namespace: className,
                     sourceAttribute: 'src',
                     paneContainer: document.getElementById("mainSlider"),
-                    inlinePane: true,
-                    inlineOffsetY: 0,
+                    inlinePane: 992,
+                    inlineOffsetY: -50,
                     touchDelay: delay,
                 };
                 const drift = new Drift(el, imageVals);
