@@ -305,6 +305,9 @@ class Mobikul(models.Model):
             [('state', '=', 'installed'), ('name', '=', 'website_sale_delivery')]) and True or False
         result['odoo_gdpr'] = ir_model_obj.search(
             [('state', '=', 'installed'), ('name', '=', 'odoo_gdpr')]) and True or False
+        result['payment_cash_on_delivery'] = ir_model_obj.search(
+            [('state', '=', 'installed'), ('name', '=', 'payment_cash_on_delivery')]) and True or False
+
         return result
 
     def email_verification_defaults(self):

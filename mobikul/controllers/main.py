@@ -191,6 +191,16 @@ class MobikulApi(WebServices):
                         'avg_rating': Template.avg_review(),
                         'total_review': len(Template.fetch_active_review(Template.id))
                     })
+                if response.get('addons', {}).get('payment_cash_on_delivery',False):
+                    avail=self.check_cod_availablity(response=local,product=Template)
+                    cod = request.env['payment.acquirer'].sudo().search([('provider', '=', 'cash_on_delivery')], limit=1)
+                    #_logger.info("++++++++%r",c)
+                    result.update({
+                    'cod_details':{
+                    'cod_availability':avail,
+                    'cod_msg':cod.cod_rule.cod_availability_message if avail else cod.cod_rule.cod_unavailability_message
+                }   })
+
                 if response.get('addons', {}).get('odoo_marketplace'):
                     if Template.marketplace_seller_id and Template.marketplace_seller_id.website_published:
                         result.update({
@@ -714,6 +724,7 @@ class MobikulApi(WebServices):
     @route('/mobikul/paymentAcquirers', csrf=False, type='http', auth="none", methods=['POST'])
     def getPaymentAcquirer(self, **kwargs):
         response = self._authenticate(True, **kwargs)
+        context =  response.get("context",{})
         if response.get('success'):
             result = {}
             AcquirerObj = request.env['payment.acquirer'].sudo()
@@ -731,6 +742,16 @@ class MobikulApi(WebServices):
                     result['acquirers'][index]['extraKey'] = result['acquirers'][index].pop(
                         'mobikul_extra_key') or ""
                     result['acquirers'][index].pop('write_date', None)
+                    acq=result['acquirers'][index]
+                    if acq.get("code",'')=="PAYMENT_COD":
+                        cod=AcquirerObj.sudo().browse(int(acq.get('id')))
+                        avail=self.check_cod_availablity(response=context,product=None, payment_acquirer=cod)
+                                                #_logger.info("++++++++%r",c)
+                        result['acquirers'][index].update({
+                        'cod_details':{
+                        'cod_availability':avail,
+                        'cod_msg':cod.cod_rule.cod_availability_message if avail else cod.cod_rule.cod_unavailability_payment_message
+                    }   })
                 result['message'] = "Payment Acquirer list."
             else:
                 result = {'success': False, 'message': 'No Active Payment methods found.'}

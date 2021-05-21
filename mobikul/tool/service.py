@@ -175,6 +175,21 @@ class WebServices(Controller):
                 ('WWW-Authenticate', 'Basic realm="Welcome to Odoo Webservice, please enter the authentication key as the login. No password required."')]
             return werkzeug.wrappers.Response('401 Unauthorized %r' % request.httprequest.authorization, status=401, headers=headers)
 
+    def check_cod_availablity(self, response,product=None, payment_acquirer=None):
+        cod = request.env['payment.acquirer'].sudo().search([('provider', '=', 'cash_on_delivery')], limit=1)
+        order = request.context.get("partner").sudo().last_mobikul_so_id
+        recipient = response.get('partner',request.env.user.partner_id)
+        #_logger.info("--------%r",(order,recipient,request.context.get("partner")))
+        if product and cod.cod_rule:
+            return cod.validate_address(recipient) and product.id not in[product_item.id for product_item in cod.cod_rule.exclude_product]
+        if payment_acquirer and payment_acquirer.provider == 'cash_on_delivery' and cod.cod_rule:
+            product_in_line = set(
+                order_line.product_id.product_tmpl_id.id for order_line in order.order_line)
+            exclude_product = set(
+                product_item.id for product_item in cod.cod_rule.exclude_product)
+            return cod.validate_address(recipient) and order.amount_total >= cod.cod_rule.min_order_amount and order.amount_total <= cod.cod_rule.max_order_amount and not product_in_line & exclude_product
+        return True
+
     def _languageData(self, mobikul):
         temp = {
             'defaultLanguage': (mobikul.default_lang.code, mobikul.default_lang.name),
@@ -195,6 +210,8 @@ class WebServices(Controller):
     def _getAquirerCredentials(self, order_name, Acquirer, response):
         if Acquirer.mobikul_reference_code == 'COD':
             return {'status': True, 'code': 'COD', 'auth': False}
+        elif Acquirer.mobikul_reference_code == 'PAYMENT_COD':
+            return {'status': True, 'code': 'CASH', 'auth': False}
         elif Acquirer.mobikul_reference_code == 'STRIPE_W':
             Transaction = request.env['payment.transaction'].sudo()
             return {'status': True, 'paymentReference': Transaction.get_next_reference(order_name), 'code': 'STRIPE', 'auth': True, 'secret_key': Acquirer.stripe_checkout_client_secret_key, 'publishable_key': Acquirer.stripe_checkout_publishable_key}
@@ -205,7 +222,7 @@ class WebServices(Controller):
             return {'status': False, 'message': _('Payment Mode not Available.')}
 
     def _getAquirerState(self, Acquirer, status=False):
-        if Acquirer.mobikul_reference_code in ['COD']:
+        if Acquirer.mobikul_reference_code in ['COD','PAYMENT_COD']:
             return "pending"
         elif Acquirer.mobikul_reference_code in ['STRIPE_W', 'STRIPE_E']:
             return STATUS_MAPPING['STRIPE'].get(status, 'pending')
